@@ -1,7 +1,13 @@
 import bcrypt from 'bcrypt';
-import { findUserByEmail, createUserWithDefaultRole } from './auth.repository';
+import {
+  findUserByEmail,
+  createUserWithDefaultRole,
+  saveRefreshToken,
+  findRefreshToken,
+  deleteRefreshToken,
+} from './auth.repository';
 import { RegisterInput, LoginInput } from './auth.types';
-import { signToken } from '../../utils/jwt';
+import { signAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry } from '../../utils/jwt';
 
 export const registerUser = async (input: RegisterInput) => {
   const existing = await findUserByEmail(input.email);
@@ -18,7 +24,37 @@ export const loginUser = async (input: LoginInput) => {
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) throw new Error('Invalid credentials');
 
-  const token = signToken({ userId: user.id });
+  const accessToken = signAccessToken({ userId: user.id });
+  const { raw, hash } = generateRefreshToken();
+  await saveRefreshToken(user.id, hash, getRefreshTokenExpiry());
 
-  return { token, user: { id: user.id, username: user.username, email: user.email } };
+  return {
+    accessToken,
+    refreshToken: raw,
+    user: { id: user.id, username: user.username, email: user.email },
+  };
+};
+
+export const refreshUserToken = async (rawRefreshToken: string) => {
+  const hash = hashRefreshToken(rawRefreshToken);
+  const stored = await findRefreshToken(hash);
+  if (!stored) throw new Error('Invalid refresh token');
+
+  if (stored.expiresAt < new Date()) {
+    await deleteRefreshToken(hash);
+    throw new Error('Refresh token expired');
+  }
+
+  await deleteRefreshToken(hash);
+
+  const accessToken = signAccessToken({ userId: stored.userId });
+  const { raw, hash: newHash } = generateRefreshToken();
+  await saveRefreshToken(stored.userId, newHash, getRefreshTokenExpiry());
+
+  return { accessToken, refreshToken: raw };
+};
+
+export const logoutUser = async (rawRefreshToken: string) => {
+  const hash = hashRefreshToken(rawRefreshToken);
+  await deleteRefreshToken(hash);
 };

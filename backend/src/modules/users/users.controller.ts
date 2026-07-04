@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
 import { getRolesByUserId, roleExistsForUser, getUserById } from './users.repository';
-import { signToken } from '../../utils/jwt';
+import { signAccessToken } from '../../utils/jwt';
 
 function getUserId(req: Request, res: Response): number | null {
   const userId = req.user?.userId;
@@ -35,7 +35,7 @@ export const setActiveRole = async (req: Request, res: Response) => {
   const owns = await roleExistsForUser(userId, parsed.data.role);
   if (!owns) return res.status(403).json({ error: 'You do not own this role' });
 
-  const token = signToken({
+  const token = signAccessToken({
     userId,
     activeRole: parsed.data.role,
   });

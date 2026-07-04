@@ -14,8 +14,12 @@ async function main() {
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.productReview.deleteMany();
+  await prisma.coupon.deleteMany();
   await prisma.product.deleteMany();
   await prisma.store.deleteMany();
+  await prisma.address.deleteMany();
+  await prisma.appReview.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.user.deleteMany();
 
@@ -106,6 +110,21 @@ async function main() {
   });
   console.log(`Buyer ${buyer.email} created with wallet Rp 5.000.000`);
 
+  const address = await prisma.address.create({
+    data: {
+      buyerId: buyer.id,
+      label: 'Rumah',
+      recipientName: 'Buyer',
+      phone: '08123456789',
+      street: 'Jl. Contoh No. 1',
+      city: 'Jakarta',
+      province: 'DKI Jakarta',
+      postalCode: '12345',
+      isDefault: true,
+    },
+  });
+  console.log(`Address created for buyer`);
+
   const driver = await prisma.user.upsert({
     where: { email: 'driver@seapedia.com' },
     update: {},
@@ -117,6 +136,98 @@ async function main() {
     },
   });
   console.log(`Driver created: ${driver.email}`);
+
+  const voucher = await prisma.coupon.create({
+    data: {
+      storeId: store.id,
+      code: 'HEMAT10',
+      category: 'voucher',
+      type: 'percent',
+      value: 10,
+      minPurchase: 50000,
+      maxUsage: 50,
+      usageCount: 0,
+    },
+  });
+  console.log(`Voucher created: ${voucher.code}`);
+
+  const promo = await prisma.coupon.create({
+    data: {
+      storeId: store.id,
+      code: 'DISKON5K',
+      category: 'promo',
+      type: 'nominal',
+      value: 5000,
+      minPurchase: 25000,
+      maxUsage: 100,
+      usageCount: 0,
+    },
+  });
+  console.log(`Promo created: ${promo.code}`);
+
+  const createdProducts = await prisma.product.findMany({ where: { storeId: store.id } });
+
+  const order1 = await prisma.order.create({
+    data: {
+      buyerId: buyer.id,
+      storeId: store.id,
+      addressId: address.id,
+      deliveryMethod: 'regular',
+      deliveryFee: 8000,
+      subtotal: createdProducts.slice(0, 2).reduce((s, p) => s + Number(p.price), 0),
+      discount: 0,
+      ppn: Math.round(createdProducts.slice(0, 2).reduce((s, p) => s + Number(p.price), 0) * 0.12),
+      total: 0,
+      status: 'menunggu_pengirim',
+      driverId: null,
+    },
+  });
+  const total1 = Number(order1.subtotal) - Number(order1.discount) + Number(order1.ppn) + Number(order1.deliveryFee);
+  await prisma.order.update({ where: { id: order1.id }, data: { total: total1 } });
+
+  for (const p of createdProducts.slice(0, 2)) {
+    await prisma.orderItem.create({
+      data: { orderId: order1.id, productId: p.id, quantity: 1, price: Number(p.price) },
+    });
+  }
+  await prisma.orderStatusHistory.create({
+    data: { orderId: order1.id, status: 'sedang_dikemas' },
+  });
+  await prisma.orderStatusHistory.create({
+    data: { orderId: order1.id, status: 'menunggu_pengirim' },
+  });
+
+  const order2 = await prisma.order.create({
+    data: {
+      buyerId: buyer.id,
+      storeId: store.id,
+      addressId: address.id,
+      deliveryMethod: 'next_day',
+      deliveryFee: 15000,
+      subtotal: createdProducts.slice(2, 4).reduce((s, p) => s + Number(p.price), 0),
+      discount: 0,
+      ppn: Math.round(createdProducts.slice(2, 4).reduce((s, p) => s + Number(p.price), 0) * 0.12),
+      total: 0,
+      status: 'menunggu_pengirim',
+      driverId: driver.id,
+    },
+  });
+  const total2 = Number(order2.subtotal) - Number(order2.discount) + Number(order2.ppn) + Number(order2.deliveryFee);
+  await prisma.order.update({ where: { id: order2.id }, data: { total: total2 } });
+
+  for (const p of createdProducts.slice(2, 4)) {
+    await prisma.orderItem.create({
+      data: { orderId: order2.id, productId: p.id, quantity: 1, price: Number(p.price) },
+    });
+  }
+  await prisma.orderStatusHistory.create({
+    data: { orderId: order2.id, status: 'sedang_dikemas' },
+  });
+  await prisma.orderStatusHistory.create({
+    data: { orderId: order2.id, status: 'menunggu_pengirim' },
+  });
+
+  console.log(`2 demo delivery orders created`);
 
   const reviews = [
     { reviewerName: 'Budi', rating: 5, comment: 'Amazing marketplace! Really easy to use and great product selection.' },

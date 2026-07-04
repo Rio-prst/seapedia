@@ -1,6 +1,10 @@
 import prisma from '../../config/prisma';
 import type { OrderStatus, Prisma, DeliveryMethod } from '@prisma/client';
 
+
+
+
+
 const orderInclude = {
   store: { select: { id: true, name: true } },
   address: {
@@ -15,11 +19,13 @@ const orderInclude = {
       postalCode: true,
     },
   },
+  coupon: { select: { id: true, code: true, category: true, type: true, value: true } },
   items: {
     include: {
       product: { select: { id: true, name: true } },
     },
   },
+  driver: { select: { id: true, username: true } },
   statusHistory: { orderBy: { createdAt: 'asc' as const } },
 } as const;
 
@@ -53,6 +59,8 @@ export const createOrder = (
   discount: number,
   ppn: number,
   total: number,
+  couponId?: number | null,
+  deliveryDeadline?: Date | null,
   tx?: Prisma.TransactionClient,
 ) => {
   const client = tx ?? prisma;
@@ -67,6 +75,8 @@ export const createOrder = (
       discount,
       ppn,
       total,
+      couponId,
+      deliveryDeadline,
       status: 'sedang_dikemas',
     },
     include: orderInclude,
@@ -106,4 +116,17 @@ export const batchUpdateStocks = (
     `UPDATE products SET stock = stock - t.quantity FROM (VALUES ${values}) AS t(id, quantity) WHERE products.id = t.id`,
     ...flatArgs,
   );
+};
+
+export const updateOrderStatusFn = (
+  orderId: number,
+  status: OrderStatus,
+  tx?: Prisma.TransactionClient,
+) => {
+  const client = tx ?? prisma;
+  return client.order.update({
+    where: { id: orderId },
+    data: { status },
+    include: orderInclude,
+  });
 };

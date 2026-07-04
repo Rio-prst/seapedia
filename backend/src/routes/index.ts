@@ -8,6 +8,11 @@ import walletRoutes from '../modules/wallet/wallet.routes';
 import addressRoutes from '../modules/address/address.routes';
 import cartRoutes from '../modules/cart/cart.routes';
 import orderRoutes from '../modules/order/order.routes';
+import couponRoutes from '../modules/coupon/coupon.routes';
+import dashboardRoutes from '../modules/dashboard/dashboard.routes';
+import productReviewRoutes from '../modules/productReview/productReview.routes';
+import deliveryRoutes from '../modules/delivery/delivery.routes';
+import adminRoutes from '../modules/admin/admin.routes';
 
 const router = Router();
 router.use('/auth', authRoutes);
@@ -19,5 +24,10 @@ router.use('/wallet', walletRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', orderRoutes);
+router.use('/coupons', couponRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/products/:productId/reviews', productReviewRoutes);
+router.use('/deliveries', deliveryRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;
